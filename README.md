@@ -1,5 +1,5 @@
-# ☁️ My Cloud
-
+# ☁️ My Cloudd
+> 🌐 **Развёрнутое приложение:** http://194.67.102.69/
 **Облачное хранилище файлов** — SPA-приложение с бэкендом на Django и фронтендом на React.
 
 [![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
@@ -417,7 +417,7 @@ pip install -r requirements.txt
 
 ```python
 DEBUG = False
-ALLOWED_HOSTS = ['your-domain.ru', '123.45.67.89']
+ALLOWED_HOSTS = ['194.67.102.69', '123.45.67.89']
 ```
 
 ```bash
@@ -473,7 +473,7 @@ sudo systemctl status mycloud
 ```nginx
 server {
     listen 80;
-    server_name your-domain.ru;
+    server_name 194.67.102.69;
 
     client_max_body_size 100M;
 
@@ -498,7 +498,7 @@ sudo systemctl reload nginx
 
 ### 8. Проверка
 
-Откройте `http://your-domain.ru/` — должна открыться главная страница.
+Откройте `http://194.67.102.69/` — должна открыться главная страница.
 
 ---
 
