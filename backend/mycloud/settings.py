@@ -96,17 +96,22 @@ REST_FRAMEWORK = {
     ],
 }
 
-# === CORS (для dev-режима: фронт на :3000, бэк на :8000) ===
+# === CORS (для dev-режима, когда фронт на :3000) ===
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:3000',
     'http://127.0.0.1:3000',
 ]
+
+# === CSRF trusted origins (dev + prod) ===
 CSRF_TRUSTED_ORIGINS = [
+    # Development
     'http://localhost:3000',
     'http://127.0.0.1:3000',
     'http://localhost:8000',
     'http://127.0.0.1:8000',
+    # Production
+    'http://194.67.102.69',
 ]
 
 # === Sessions ===

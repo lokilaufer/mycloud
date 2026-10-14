@@ -67,11 +67,32 @@ def user_detail(request, pk):
         return Response({'detail': 'Not found'}, status=404)
 
     if request.method == 'DELETE':
+        # Запрет админу удалить самого себя
+        if user.pk == request.user.pk:
+            logger.warning('Admin %s tried to delete self', request.user.login)
+            return Response(
+                {'detail': 'Нельзя удалить самого себя'},
+                status=400,
+            )
         logger.info('Admin %s deletes user %s', request.user.login, user.login)
         user.delete()
         return Response(status=204)
 
+    # PATCH
     if 'is_admin' in request.data:
-        user.is_admin = bool(request.data['is_admin'])
+        new_value = bool(request.data['is_admin'])
+        # Запрет админу снять с себя права администратора
+        if user.pk == request.user.pk and new_value is False:
+            logger.warning('Admin %s tried to revoke own admin', request.user.login)
+            return Response(
+                {'detail': 'Нельзя снять права администратора с самого себя'},
+                status=400,
+            )
+        user.is_admin = new_value
+        # Синхронизируем is_staff (нужно для IsAdminUser)
+        user.is_staff = new_value
         user.save()
+        logger.info('Admin %s set is_admin=%s for %s',
+                    request.user.login, new_value, user.login)
+
     return Response(UserSerializer(user).data)

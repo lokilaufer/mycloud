@@ -14,6 +14,7 @@ export default function Storage() {
 
   const [file, setFile] = useState(null);
   const [comment, setComment] = useState('');
+  const [uploadError, setUploadError] = useState('');
 
   useEffect(() => {
     dispatch(fetchFiles(userId));
@@ -21,15 +22,25 @@ export default function Storage() {
 
   const handleUpload = async (e) => {
     e.preventDefault();
+    setUploadError('');
+
     if (!file) {
-      alert('Выберите файл');
+      setUploadError('Выберите файл');
       return;
     }
-    await dispatch(uploadFile({ file, comment }));
-    setFile(null);
-    setComment('');
-    e.target.reset();
-    dispatch(fetchFiles(userId));
+
+    const res = await dispatch(uploadFile({ file, comment }));
+
+    if (res.meta.requestStatus === 'fulfilled') {
+      setFile(null);
+      setComment('');
+      e.target.reset();
+      dispatch(fetchFiles(userId));
+    } else {
+      setUploadError(
+        res.payload?.detail || 'Не удалось загрузить файл'
+      );
+    }
   };
 
   const handleDelete = (id, name) => {
@@ -40,8 +51,14 @@ export default function Storage() {
 
   const handleRename = (id, oldName) => {
     const newName = prompt('Новое имя файла:', oldName);
-    if (newName && newName !== oldName) {
-      dispatch(updateFile({ id, data: { original_name: newName } }));
+    if (newName === null) return;
+    const trimmed = newName.trim();
+    if (!trimmed) {
+      alert('Имя файла не может быть пустым');
+      return;
+    }
+    if (trimmed !== oldName) {
+      dispatch(updateFile({ id, data: { original_name: trimmed } }));
     }
   };
 
@@ -55,7 +72,10 @@ export default function Storage() {
   const handleShare = async (id) => {
     const res = await dispatch(shareFile(id));
     if (res.meta.requestStatus === 'fulfilled') {
-      const url = `${window.location.origin}/api/s/${res.payload.special_link}/`;
+      // backend теперь возвращает и special_link, и полный url
+      const url =
+        res.payload.url ||
+        `${window.location.origin}/api/s/${res.payload.special_link}/`;
       try {
         await navigator.clipboard.writeText(url);
         alert('Ссылка скопирована:\n' + url);
@@ -86,7 +106,10 @@ export default function Storage() {
         <form onSubmit={handleUpload} className="upload-form">
           <input
             type="file"
-            onChange={(e) => setFile(e.target.files[0])}
+            onChange={(e) => {
+              setFile(e.target.files[0]);
+              setUploadError('');
+            }}
           />
           <input
             type="text"
@@ -96,6 +119,10 @@ export default function Storage() {
           />
           <button type="submit" className="btn">Загрузить</button>
         </form>
+      )}
+
+      {uploadError && (
+        <p className="error" style={{ marginBottom: 16 }}>{uploadError}</p>
       )}
 
       {loading && <p className="muted">Загрузка...</p>}
