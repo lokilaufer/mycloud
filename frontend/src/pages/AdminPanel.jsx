@@ -1,28 +1,38 @@
 import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchUsers, deleteUser, toggleAdmin } from '../store/usersSlice';
+import {
+  fetchUsers, deleteUser, toggleAdmin, clearUsersError,
+} from '../store/usersSlice';
 
 export default function AdminPanel() {
   const dispatch = useDispatch();
-  const { list, loading } = useSelector((s) => s.users);
+  const { list, loading, error } = useSelector((s) => s.users);
 
   useEffect(() => {
     dispatch(fetchUsers());
   }, [dispatch]);
 
-  const handleDelete = (id, login) => {
+  const handleDelete = async (id, login) => {
     if (
       window.confirm(
         `Удалить пользователя "${login}"? Все его файлы также будут удалены.`
       )
     ) {
-      dispatch(deleteUser(id));
+      dispatch(clearUsersError());
+      const res = await dispatch(deleteUser(id));
+      if (res.meta.requestStatus === 'rejected') {
+        alert(res.payload?.detail || 'Не удалось удалить пользователя');
+      }
     }
   };
 
-  const handleToggleAdmin = (id, is_admin) => {
-    dispatch(toggleAdmin({ id, is_admin: !is_admin }));
+  const handleToggleAdmin = async (id, is_admin) => {
+    dispatch(clearUsersError());
+    const res = await dispatch(toggleAdmin({ id, is_admin: !is_admin }));
+    if (res.meta.requestStatus === 'rejected') {
+      alert(res.payload?.detail || 'Не удалось изменить права');
+    }
   };
 
   const formatSize = (bytes) => {
@@ -37,6 +47,10 @@ export default function AdminPanel() {
       <p className="muted" style={{ marginBottom: 20 }}>
         Управление пользователями и их файловыми хранилищами.
       </p>
+
+      {error && (
+        <p className="error" style={{ marginBottom: 16 }}>{error}</p>
+      )}
 
       {loading && <p className="muted">Загрузка...</p>}
 
