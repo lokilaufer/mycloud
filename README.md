@@ -65,7 +65,7 @@
 
 - Список пользователей с логином, полным именем, email, признаком «админ»
 - Информация о хранилищах: количество и размер файлов
-- Удаление пользователей (кроме себя)
+- Удаление пользователей (нельзя удалить себя)
 - Переключение признака «администратор» (нельзя снять с себя)
 - Переход к хранилищу любого пользователя
 
@@ -135,6 +135,7 @@ mycloud/
 │   │   ├── models.py                   # User (кастомный)
 │   │   ├── serializers.py
 │   │   ├── views.py
+│   │   ├── admin.py
 │   │   └── urls.py
 │   ├── storage/                        # Приложение хранилища
 │   │   ├── migrations/
@@ -142,8 +143,10 @@ mycloud/
 │   │   ├── models.py                   # File
 │   │   ├── serializers.py
 │   │   ├── views.py
+│   │   ├── admin.py
 │   │   └── urls.py
 │   ├── storage_root/                   # Файлы пользователей (не в git)
+│   ├── staticfiles/                    # Собранная статика (не в git)
 │   ├── venv/                           # Виртуальное окружение (не в git)
 │   ├── manage.py
 │   └── requirements.txt
@@ -220,7 +223,7 @@ GRANT ALL ON SCHEMA public TO mycloud_user;
 ALTER SCHEMA public OWNER TO mycloud_user;
 ```
 
-> **Порт PostgreSQL** по умолчанию — `5432`. Если он занят (например, из-за другой версии PostgreSQL), укажите свой в `backend/mycloud/config.py`. Пароль `mycloud_pass` — пример, для продакшена используйте надёжный.
+> **Порт PostgreSQL** по умолчанию — `5432`. Если он занят (например, другой версией PostgreSQL), укажите свой в `backend/mycloud/config.py`. Пароль `mycloud_pass` — пример, для продакшена используйте надёжный.
 
 ### Шаг 3. Бэкенд
 
@@ -264,11 +267,6 @@ DB_PORT = '5432'
 # Storage
 STORAGE_ROOT = ...                   # абсолютный путь к папке файлов
 ```
-
-> ⚙️ **Как сгенерировать новый SECRET_KEY** (для продакшена):
-> ```bash
-> python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
-> ```
 
 **Миграции:**
 
@@ -328,7 +326,13 @@ npm run build
 
 ### 1. Смените `SECRET_KEY`
 
-В `backend/mycloud/config.py` укажите **новый** ключ, сгенерированный командой выше. Ключ из репозитория — **только для разработки**, в продакшене его использовать нельзя.
+В `backend/mycloud/config.py` укажите **новый** ключ:
+
+```bash
+python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+```
+
+Ключ из репозитория — **только для разработки**, в продакшене его использовать нельзя.
 
 ### 2. Отключите `DEBUG`
 
@@ -341,14 +345,14 @@ DEBUG = False
 ### 3. Укажите `ALLOWED_HOSTS`
 
 ```python
-ALLOWED_HOSTS = ['ваш-домен.ru', '194.67.102.69']   # без '123.45.67.89' и т.п.
+ALLOWED_HOSTS = ['ваш-домен.ru', '194.67.102.69']
 ```
 
 Перечислите **только** те домены и IP, по которым реально доступно приложение.
 
 ### 4. Настройте `CSRF_TRUSTED_ORIGINS`
 
-В `backend/mycloud/settings.py` добавьте прод-домен:
+В `backend/mycloud/settings.py` добавьте прод-адрес:
 
 ```python
 CSRF_TRUSTED_ORIGINS = [
@@ -359,7 +363,6 @@ CSRF_TRUSTED_ORIGINS = [
     'http://127.0.0.1:8000',
     # Production
     'http://194.67.102.69',
-    'https://ваш-домен.ru',
 ]
 ```
 
@@ -376,7 +379,7 @@ CORS_ALLOWED_ORIGINS = [
 ]
 ```
 
-Если фронт отдаётся **с того же сервера** (после `npm run build` через Django), CORS не нужен — оставьте список пустым или с dev-адресами.
+Если фронт отдаётся **с того же сервера** (после `npm run build` через Django), CORS не нужен — оставьте список с dev-адресами или пустым.
 
 ---
 
@@ -385,7 +388,6 @@ CORS_ALLOWED_ORIGINS = [
 | Роль | Логин | Пароль |
 |:----:|:-----:|:------:|
 | **Администратор** | `admin` | `Admin123!` |
-| **Пользователь** | `testuser` | `Test123!` |
 
 > ⚠️ В продакшене **обязательно смените пароль `admin`** на надёжный (через Django admin → «Изменить пароль»).
 
@@ -418,7 +420,7 @@ CORS_ALLOWED_ORIGINS = [
 | `PATCH` | `/api/files/<id>/` | Изменить `original_name` / `comment` | Владелец |
 | `DELETE` | `/api/files/<id>/` | Удалить файл | Владелец |
 | `GET` | `/api/files/<id>/download/` | Скачать с оригинальным именем | Владелец |
-| `POST` | `/api/files/<id>/share/` | Получить спец-ссылку (UUID + полный URL) | Владелец |
+| `POST` | `/api/files/<id>/share/` | Получить спец-ссылку | Владелец |
 | `GET` | `/api/s/<uuid>/` | Скачать по спец-ссылке | Аноним |
 
 ### Отладка
@@ -483,6 +485,7 @@ cd backend
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
+pip install gunicorn
 ```
 
 Отредактируйте `backend/mycloud/config.py`:
@@ -490,7 +493,7 @@ pip install -r requirements.txt
 ```python
 SECRET_KEY = '<новый ключ>'           # обязательно смените
 DEBUG = False                         # обязательно
-ALLOWED_HOSTS = ['194.67.102.69']    # замените на свой IP/домен
+ALLOWED_HOSTS = ['194.67.102.69']    # ваш IP/домен
 ```
 
 Также убедитесь, что `CSRF_TRUSTED_ORIGINS` в `settings.py` содержит ваш прод-адрес:
@@ -539,13 +542,12 @@ ExecStart=/var/www/mycloud/backend/venv/bin/gunicorn \
 WantedBy=multi-user.target
 ```
 
-> **Почему сокет в `/var/www/mycloud/`, а не в `/run/`:** в Ubuntu 24.04 директория `/run` защищена — `www-data` не может создавать там файлы. Путь `/var/www/mycloud/mycloud.sock` работает надёжно.
+> **Про путь сокета:** в Ubuntu 24.04 директория `/run` защищена — `www-data` не может создавать там файлы. Сокет размещается в `/var/www/mycloud/mycloud.sock`.
 
 Запустите:
 
 ```bash
 source /var/www/mycloud/backend/venv/bin/activate
-pip install gunicorn
 chown -R www-data:www-data /var/www/mycloud
 sudo systemctl daemon-reload
 sudo systemctl enable --now mycloud
@@ -574,7 +576,7 @@ server {
 }
 ```
 
-> **Обратите внимание:** `/static/` указывает на `backend/staticfiles/` (куда `collectstatic` собрал все CSS/JS — и админки, и React). Если указать `frontend/build/static/`, то сломается Django admin.
+> **Важно:** `/static/` указывает на `backend/staticfiles/` — сюда `collectstatic` собирает все CSS/JS: и админки Django, и React. Если указать `frontend/build/static/`, то сломается Django admin.
 
 Активируйте:
 
@@ -585,7 +587,25 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-### 8. Проверка
+### 8. Обновление после изменений в коде
+
+Каждый раз после `git push` локально:
+
+```bash
+cd /var/www/mycloud
+git pull
+cd frontend && npm run build && cd ..
+cd backend
+source venv/bin/activate
+python manage.py collectstatic --noinput
+chown -R www-data:www-data /var/www/mycloud/backend/staticfiles
+cd ..
+systemctl restart mycloud
+```
+
+В браузере — **Ctrl+F5** (жёсткое обновление без кэша).
+
+### 9. Проверка
 
 Откройте `http://194.67.102.69/` — должна открыться главная страница.
 
@@ -596,11 +616,11 @@ sudo systemctl reload nginx
 Сервер пишет события в консоль с датой, временем, уровнем и именем логгера:
 
 ```
-2026-10-06 21:39:08,558 INFO users User logged in: testuser
-2026-10-06 21:39:30,123 INFO storage User testuser uploaded file test.txt (16 bytes)
-2026-10-06 21:40:05,800 WARNING users Login failed for: nosuchuser
-2026-10-06 21:41:12,001 INFO storage File downloaded: test.txt
-2026-10-06 21:42:44,500 ERROR django.request Internal Server Error: /api/files/
+2026-10-14 19:12:08,558 INFO users User logged in: admin
+2026-10-14 19:12:30,123 INFO storage User admin uploaded file Локи вулкан.jpg (151695 bytes)
+2026-10-14 19:13:05,800 WARNING users Login failed for: nosuchuser
+2026-10-14 19:14:12,001 INFO storage File downloaded: Локи вулкан.jpg
+2026-10-14 19:15:44,500 ERROR django.request Internal Server Error: /api/files/
 ```
 
 Уровни: `DEBUG`, `INFO`, `WARNING`, `ERROR`. Настроено в `settings.py` → `LOGGING`.
