@@ -1,5 +1,7 @@
-# ☁️ My Cloudd
+# ☁️ My Cloud
+
 > 🌐 **Развёрнутое приложение:** http://194.67.102.69/
+
 **Облачное хранилище файлов** — SPA-приложение с бэкендом на Django и фронтендом на React.
 
 [![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
@@ -9,7 +11,7 @@
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev/)
 [![Redux](https://img.shields.io/badge/Redux_Toolkit-2-764ABC?logo=redux&logoColor=white)](https://redux-toolkit.js.org/)
 [![React Router](https://img.shields.io/badge/React_Router-7-CA4245?logo=reactrouter&logoColor=white)](https://reactrouter.com/)
-[![License](https://img.shields.io/badge/license-Educational-blue)](#лицензия)
+[![License](https://img.shields.io/badge/license-Educational-blue)](#-лицензия)
 
 ---
 
@@ -21,11 +23,13 @@
 - [Структура проекта](#-структура-проекта)
 - [Требования](#-требования)
 - [Установка и запуск](#-установка-и-запуск)
+- [Настройка production](#-настройка-production)
 - [Учётные данные](#-учётные-данные)
 - [API](#-api)
 - [Подсказки по интерфейсу](#-подсказки-по-интерфейсу)
 - [Развёртывание на reg.ru](#-развёртывание-на-regru)
 - [Логирование](#-логирование)
+- [Статус проекта](#-статус-проекта)
 - [Лицензия](#-лицензия)
 
 ---
@@ -61,8 +65,8 @@
 
 - Список пользователей с логином, полным именем, email, признаком «админ»
 - Информация о хранилищах: количество и размер файлов
-- Удаление пользователей
-- Переключение признака «администратор»
+- Удаление пользователей (кроме себя)
+- Переключение признака «администратор» (нельзя снять с себя)
 - Переход к хранилищу любого пользователя
 
 ### Хранилище
@@ -70,7 +74,7 @@
 Доступно любому аутентифицированному пользователю:
 
 - Список файлов с полями: имя, комментарий, размер, дата загрузки, дата последнего скачивания
-- Загрузка нового файла с комментарием
+- Загрузка нового файла с комментарием (максимум 100 МБ)
 - Скачивание с оригинальным именем
 - Переименование, изменение комментария, удаление
 - Формирование специальной обезличенной ссылки
@@ -108,7 +112,7 @@
 | Инструмент | Назначение |
 |:----------:|-----------|
 | **Git + GitHub** | Контроль версий |
-| **reg.ru** | Хостинг |
+| **reg.ru (VPS)** | Хостинг |
 | **nginx + gunicorn** | Продакшен-сервер |
 
 ---
@@ -196,7 +200,7 @@ cd mycloud
 
 ### Шаг 2. PostgreSQL
 
-Создайте базу данных и пользователя:
+Создайте базу данных **`mycloud_db`** и пользователя **`mycloud_user`** с паролем **`mycloud_pass`**:
 
 ```sql
 CREATE DATABASE mycloud_db;
@@ -216,7 +220,7 @@ GRANT ALL ON SCHEMA public TO mycloud_user;
 ALTER SCHEMA public OWNER TO mycloud_user;
 ```
 
-> Порт PostgreSQL по умолчанию — `5432`. Если занят, укажите свой в `backend/mycloud/config.py`.
+> **Порт PostgreSQL** по умолчанию — `5432`. Если он занят (например, из-за другой версии PostgreSQL), укажите свой в `backend/mycloud/config.py`. Пароль `mycloud_pass` — пример, для продакшена используйте надёжный.
 
 ### Шаг 3. Бэкенд
 
@@ -245,18 +249,26 @@ pip install -r requirements.txt
 **Проверьте `backend/mycloud/config.py`:**
 
 ```python
-SECRET_KEY = '...'
-DEBUG = True
-ALLOWED_HOSTS = ['*']
+# Django
+SECRET_KEY = '...'                   # для продакшена сгенерируйте новый
+DEBUG = True                         # для продакшена DEBUG = False
+ALLOWED_HOSTS = ['*']                # для продакшена перечислите домены/IP
 
+# PostgreSQL
 DB_NAME = 'mycloud_db'
 DB_USER = 'mycloud_user'
 DB_PASSWORD = 'mycloud_pass'
 DB_HOST = 'localhost'
 DB_PORT = '5432'
 
-STORAGE_ROOT = ...
+# Storage
+STORAGE_ROOT = ...                   # абсолютный путь к папке файлов
 ```
+
+> ⚙️ **Как сгенерировать новый SECRET_KEY** (для продакшена):
+> ```bash
+> python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+> ```
 
 **Миграции:**
 
@@ -300,7 +312,7 @@ npm run build
 
 Появится папка `frontend/build/`. Django настроен на её отдачу автоматически.
 
-**Готово:** приложение доступно с одного сервера — `http://127.0.0.1:8000/`
+✅ **Готово:** приложение доступно с одного сервера — `http://127.0.0.1:8000/`
 
 **После изменений во фронтенде:**
 
@@ -310,14 +322,72 @@ npm run build
 
 ---
 
+## ⚙️ Настройка production
+
+Перед развёртыванием в продакшене обязательно:
+
+### 1. Смените `SECRET_KEY`
+
+В `backend/mycloud/config.py` укажите **новый** ключ, сгенерированный командой выше. Ключ из репозитория — **только для разработки**, в продакшене его использовать нельзя.
+
+### 2. Отключите `DEBUG`
+
+```python
+DEBUG = False
+```
+
+При `DEBUG = True` Django показывает трассировки ошибок и настройки — это критично для безопасности.
+
+### 3. Укажите `ALLOWED_HOSTS`
+
+```python
+ALLOWED_HOSTS = ['ваш-домен.ru', '194.67.102.69']   # без '123.45.67.89' и т.п.
+```
+
+Перечислите **только** те домены и IP, по которым реально доступно приложение.
+
+### 4. Настройте `CSRF_TRUSTED_ORIGINS`
+
+В `backend/mycloud/settings.py` добавьте прод-домен:
+
+```python
+CSRF_TRUSTED_ORIGINS = [
+    # Development
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'http://localhost:8000',
+    'http://127.0.0.1:8000',
+    # Production
+    'http://194.67.102.69',
+    'https://ваш-домен.ru',
+]
+```
+
+Без этого Django может отклонять POST/PATCH/DELETE-запросы с прод-домена (ошибка `CSRF verification failed`).
+
+### 5. Настройте `CORS_ALLOWED_ORIGINS` (при раздельном запуске)
+
+Если фронтенд запускается **отдельно** от Django (например, на `http://localhost:3000` в dev-режиме), в `settings.py` должен быть адрес фронта:
+
+```python
+CORS_ALLOWED_ORIGINS = [
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+]
+```
+
+Если фронт отдаётся **с того же сервера** (после `npm run build` через Django), CORS не нужен — оставьте список пустым или с dev-адресами.
+
+---
+
 ## 🔑 Учётные данные
 
 | Роль | Логин | Пароль |
 |:----:|:-----:|:------:|
-| Администратор | `admin` | `Admin123!` |
-| Пользователь | `testuser` | `Test123!` |
+| **Администратор** | `admin` | `Admin123!` |
+| **Пользователь** | `testuser` | `Test123!` |
 
-> ⚠️ В продакшене обязательно смените пароль `admin`.
+> ⚠️ В продакшене **обязательно смените пароль `admin`** на надёжный (через Django admin → «Изменить пароль»).
 
 ---
 
@@ -334,26 +404,28 @@ npm run build
 | `POST` | `/api/logout/` | Выход | Auth |
 | `GET` | `/api/me/` | Текущий пользователь | Auth |
 | `GET` | `/api/users/` | Список пользователей | Админ |
-| `PATCH` | `/api/users/<id>/` | Изменить `is_admin` | Админ |
-| `DELETE` | `/api/users/<id>/` | Удалить пользователя | Админ |
+| `PATCH` | `/api/users/<id>/` | Изменить `is_admin` (только это поле) | Админ |
+| `DELETE` | `/api/users/<id>/` | Удалить пользователя (нельзя себя) | Админ |
+
+> **PATCH `/api/users/<id>/`** принимает **только** поле `is_admin` (boolean). Админ не может снять права администратора с самого себя — API вернёт `400`.
 
 ### Файлы
 
 | Метод | Endpoint | Описание | Доступ |
 |:-----:|----------|----------|:------:|
 | `GET` | `/api/files/` | Список файлов (админ: `?user_id=<id>`) | Auth |
-| `POST` | `/api/files/upload/` | Загрузка файла (`file`, `comment`) | Auth |
+| `POST` | `/api/files/upload/` | Загрузка файла (`file`, `comment`), макс. 100 МБ | Auth |
 | `PATCH` | `/api/files/<id>/` | Изменить `original_name` / `comment` | Владелец |
 | `DELETE` | `/api/files/<id>/` | Удалить файл | Владелец |
 | `GET` | `/api/files/<id>/download/` | Скачать с оригинальным именем | Владелец |
-| `POST` | `/api/files/<id>/share/` | Получить специальную ссылку | Владелец |
-| `GET` | `/api/s/<uuid>/` | Скачать по специальной ссылке | Аноним |
+| `POST` | `/api/files/<id>/share/` | Получить спец-ссылку (UUID + полный URL) | Владелец |
+| `GET` | `/api/s/<uuid>/` | Скачать по спец-ссылке | Аноним |
 
 ### Отладка
 
 | URL | Назначение |
 |-----|-----------|
-| `/api/auth/login/` | Страница входа DRF |
+| `/api/auth/login/` | Страница входа DRF (для отладки) |
 | `/admin/` | Django admin |
 
 ---
@@ -364,12 +436,12 @@ npm run build
   - **Гость** — «Вход», «Регистрация»
   - **Пользователь** — «Хранилище», имя, «Выход»
   - **Администратор** — дополнительно «Админ-панель»
-- **Загрузка файла** — на странице «Хранилище»: выберите файл, добавьте комментарий, нажмите «Загрузить»
-- **Специальная ссылка** — кнопка «Ссылка» рядом с файлом. URL копируется в буфер обмена
-- **Редактирование** — кнопки «Переименовать» и «Комментарий» открывают окно ввода
-- **Удаление** — подтверждается диалогом
-- **Админ-панель** — чекбокс переключает признак «админ»; ссылка «Открыть» ведёт в хранилище пользователя
-- **Единый сервер** — после сборки открывайте только `http://127.0.0.1:8000/`
+- **Загрузка файла** — на странице «Хранилище»: выберите файл, добавьте комментарий, нажмите «Загрузить». Максимум 100 МБ.
+- **Специальная ссылка** — кнопка «Ссылка» рядом с файлом. URL копируется в буфер обмена. Откройте в режиме инкогнито — файл скачается без авторизации.
+- **Редактирование** — кнопки «Переименовать» и «Комментарий» открывают окно ввода. Пустое имя файла не допускается.
+- **Удаление** — подтверждается диалогом.
+- **Админ-панель** — чекбокс переключает признак «админ»; ссылка «Открыть» ведёт в хранилище пользователя. Нельзя удалить себя или снять с себя права администратора.
+- **Единый сервер** — после сборки фронтенда открывайте только `http://127.0.0.1:8000/`.
 
 ---
 
@@ -416,9 +488,20 @@ pip install -r requirements.txt
 Отредактируйте `backend/mycloud/config.py`:
 
 ```python
-DEBUG = False
-ALLOWED_HOSTS = ['194.67.102.69', '123.45.67.89']
+SECRET_KEY = '<новый ключ>'           # обязательно смените
+DEBUG = False                         # обязательно
+ALLOWED_HOSTS = ['194.67.102.69']    # замените на свой IP/домен
 ```
+
+Также убедитесь, что `CSRF_TRUSTED_ORIGINS` в `settings.py` содержит ваш прод-адрес:
+
+```python
+CSRF_TRUSTED_ORIGINS = [
+    'http://194.67.102.69',
+]
+```
+
+Затем:
 
 ```bash
 python manage.py migrate
@@ -448,19 +531,22 @@ Group=www-data
 WorkingDirectory=/var/www/mycloud/backend
 Environment="PATH=/var/www/mycloud/backend/venv/bin"
 ExecStart=/var/www/mycloud/backend/venv/bin/gunicorn \
-    --workers 3 \
-    --bind unix:/run/mycloud.sock \
+    --workers 2 \
+    --bind unix:/var/www/mycloud/mycloud.sock \
     mycloud.wsgi:application
 
 [Install]
 WantedBy=multi-user.target
 ```
 
+> **Почему сокет в `/var/www/mycloud/`, а не в `/run/`:** в Ubuntu 24.04 директория `/run` защищена — `www-data` не может создавать там файлы. Путь `/var/www/mycloud/mycloud.sock` работает надёжно.
+
 Запустите:
 
 ```bash
 source /var/www/mycloud/backend/venv/bin/activate
 pip install gunicorn
+chown -R www-data:www-data /var/www/mycloud
 sudo systemctl daemon-reload
 sudo systemctl enable --now mycloud
 sudo systemctl status mycloud
@@ -478,20 +564,23 @@ server {
     client_max_body_size 100M;
 
     location /static/ {
-        alias /var/www/mycloud/frontend/build/static/;
+        alias /var/www/mycloud/backend/staticfiles/;
     }
 
     location / {
         include proxy_params;
-        proxy_pass http://unix:/run/mycloud.sock;
+        proxy_pass http://unix:/var/www/mycloud/mycloud.sock;
     }
 }
 ```
+
+> **Обратите внимание:** `/static/` указывает на `backend/staticfiles/` (куда `collectstatic` собрал все CSS/JS — и админки, и React). Если указать `frontend/build/static/`, то сломается Django admin.
 
 Активируйте:
 
 ```bash
 sudo ln -s /etc/nginx/sites-available/mycloud /etc/nginx/sites-enabled/
+sudo rm -f /etc/nginx/sites-enabled/default
 sudo nginx -t
 sudo systemctl reload nginx
 ```
@@ -507,14 +596,21 @@ sudo systemctl reload nginx
 Сервер пишет события в консоль с датой, временем, уровнем и именем логгера:
 
 ```
-2026-10-05 00:00:03,558 INFO django.utils.autoreload Watching for file changes with StatReloader
-2026-10-05 00:01:12,001 INFO users User logged in: testuser
-2026-10-05 00:01:30,123 INFO storage User testuser uploaded file test.txt
-2026-10-05 00:02:05,800 WARNING users Login failed for: nosuchuser
-2026-10-05 00:03:44,500 ERROR django.request Internal Server Error: /api/files/
+2026-10-06 21:39:08,558 INFO users User logged in: testuser
+2026-10-06 21:39:30,123 INFO storage User testuser uploaded file test.txt (16 bytes)
+2026-10-06 21:40:05,800 WARNING users Login failed for: nosuchuser
+2026-10-06 21:41:12,001 INFO storage File downloaded: test.txt
+2026-10-06 21:42:44,500 ERROR django.request Internal Server Error: /api/files/
 ```
 
 Уровни: `DEBUG`, `INFO`, `WARNING`, `ERROR`. Настроено в `settings.py` → `LOGGING`.
+
+**Просмотр логов на сервере:**
+
+```bash
+journalctl -u mycloud -n 50 --no-pager        # последние 50 строк
+journalctl -u mycloud -f                      # в реальном времени
+```
 
 ---
 
